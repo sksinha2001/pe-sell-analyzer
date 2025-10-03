@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PE Sell Analyzer</title> 
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* ADDED: CSS for color-coding the output */
+        .color-red { color: red; font-weight: bold; }
+        .color-amber { color: orange; font-weight: bold; }
+        .color-green { color: green; font-weight: bold; }
+        
+        /* Added simple flex for button alignment */
+        .input-card .form-group.fetch-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-card .form-group.fetch-group button {
+            height: 38px; 
+            padding: 0 15px; 
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PE Sell Analyzer</h1>
+        <div class="calculator-grid">
+            <div class="card input-card">
+                <h2>Inputs</h2>
+                
+                <div class="form-group fetch-group">
+                    <div style="flex-grow: 1;">
+                        <label for="ticker">Ticker (e.g., INFY.NS, NIFTY)</label>
+                        <input type="text" id="ticker" value="INFY.NS" required>
+                    </div>
+                    <button type="button" onclick="fetchMarketPrice()">Fetch Price</button>
+                </div>
+                <div class="form-group">
+                    <label for="strike-price">Strike Price</label>
+                    <input type="number" id="strike-price" value="1000">
+                </div>
+                
+                <div class="form-group">
+                    <label for="expiry-date">Expiry Date</label>
+                    <input type="date" id="expiryDate"> 
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantity</label>
+                    <input type="number" id="quantity" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="premium">Premium (Rs.)</label>
+                    <input type="number" id="premium" step="0.01" value="1.00">
+                </div>
+                
+                <div class="form-group">
+                    <label for="fund-req">Fund Req (Rs.)</label>
+                    <input type="text" id="fundReq" step="0.01" value="100,000" required>
+                </div>
+            </div>
+
+            <div class="card output-card">
+                <h2>Outputs</h2>
+                <div class="output-group">
+                    <label>Current Market Price</label>
+                    <span id="market-price" class="output-value">-</span>
+                </div>
+                <hr>
+                <h3>Legend & Metrics</h3>
+                <div class="output-group">
+                    <label>DTE (Days to Expiry)</label>
+                    <span id="dte" class="output-value legend-metric">-</span>
+                </div>
+                <div class="output-group">
+                    <label>ROI Per Week</label>
+                    <span id="roi" class="output-value legend-metric">-</span>
+                </div>
+                <div class="output-group">
+                    <label>Delta %</label>
+                    <span id="delta" class="output-value legend-metric">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // NOTE: This block contains the logic that needs to run on page load and on user input.
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const fundReqInput = document.getElementById('fundReq');
+            const expiryDateInput = document.getElementById('expiryDate');
+
+            // --- DATE CALCULATION LOGIC ---
+            function calculateDefaultExpiryDate() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                let year = today.getFullYear();
+                let month = today.getMonth(); 
+                
+                // Function to find the last Tuesday of a specific month/year
+                const findLastTuesday = (y, m) => {
+                    let date = new Date(y, m + 1, 0); // Start at last day of the month
+                    while (date.getDay() !== 2) { // 2 is Tuesday
+                        date.setDate(date.getDate() - 1);
+                    }
+                    return date;
+                };
+
+                let lastTuesdayCurrent = findLastTuesday(year, month);
+
+                // Check the criteria: If this Tuesday is before or equal to today
+                let finalExpiryDate;
+                if (lastTuesdayCurrent <= today) {
+                    // Use the last Tuesday of the FOLLOWING month
+                    if (month === 11) {
+                        year++;
+                        month = 0;
+                    } else {
+                        month++;
+                    }
+                    finalExpiryDate = findLastTuesday(year, month);
+                } else {
+                    // Use the last Tuesday of the CURRENT month
+                    finalExpiryDate = lastTuesdayCurrent;
+                }
+
+                // Format as YYYY-MM-DD for the input field
+                const y = finalExpiryDate.getFullYear();
+                const m = String(finalExpiryDate.getMonth() + 1).padStart(2, '0');
+                const d = String(finalExpiryDate.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            expiryDateInput.value = calculateDefaultExpiryDate();
+
+            // --- FUND REQ FORMATTING LOGIC (Comma Separation) ---
+            function formatNumber(n) {
+                const num = parseFloat(n.replace(/,/g, ''));
+                if (isNaN(num)) return '';
+                // Use 'en-IN' locale for lakh/crore style, or 'en-US' for standard commas
+                return num.toLocaleString('en-IN', { maximumFractionDigits: 0 }); 
+            }
+
+            // Initial format of the default value
+            fundReqInput.value = formatNumber(fundReqInput.value);
+
+            fundReqInput.addEventListener('input', (event) => {
+                const cursorPosition = event.target.selectionStart;
+                const unformatted = event.target.value.replace(/,/g, '');
+                const oldValue = event.target.value;
+                
+                event.target.value = formatNumber(unformatted);
+                
+                // Recalculate cursor position
+                const newLength = event.target.value.length;
+                const oldLength = oldValue.length;
+                const offset = newLength - oldLength;
+                
+                event.target.setSelectionRange(cursorPosition + offset, cursorPosition + offset);
+            });
+        });
+
+        // --- CURRENT MARKET PRICE FETCHING LOGIC (Called by 'Fetch Price' button) ---
+        async function fetchMarketPrice() {
+            const ticker = document.getElementById('ticker').value;
+            const marketPriceSpan = document.getElementById('market-price');
+
+            if (!ticker) {
+                alert("Please enter a ticker symbol.");
+                return;
+            }
+
+            marketPriceSpan.textContent = 'Fetching...'; 
+
+            try {
+                // Call the Flask route defined in main.py
+                const response = await fetch(`/get_market_price?ticker=${ticker}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Update the Current Market Price span
+                    marketPriceSpan.textContent = `Rs. ${data.market_price.toFixed(2)}`;
+                    
+                    // Trigger full calculation after fetching price (assuming calculate() is in script.js)
+                    if (typeof calculate === 'function') {
+                        calculate();
+                    }
+
+                } else {
+                    marketPriceSpan.textContent = 'Error';
+                    alert(`Error fetching price: ${data.error || 'Failed to fetch price.'}`);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                marketPriceSpan.textContent = 'Error';
+                alert('An error occurred while connecting to the price service.');
+            }
+        }
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
