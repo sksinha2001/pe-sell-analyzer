@@ -1,11 +1,15 @@
 from flask import Flask, render_template, jsonify, request
 import yfinance as yf
-# import requests  # Not used in current logic, can be removed for clean up
-# from bs4 import BeautifulSoup # Not used in current logic, can be removed for clean up
+import os
 
 app = Flask(__name__)
 
-# --- REMOVED/COMMENTED OUT: get_nse_tickers() is no longer needed ---
+# --- NEW: Get SECRET_KEY from environment variables ---
+# This looks for the SECRET_KEY variable you set on Render.
+# The 'default-fallback-key' is only used if the variable is NOT found.
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-fallback-key')
+# -----------------------------------------------------
+
 # def get_nse_tickers():
 #     """Provides a hardcoded list of Nifty 50 tickers and major indices for reliability."""
 #     try:
