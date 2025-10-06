@@ -40,23 +40,35 @@ def load_ticker_data():
 def get_yf_ticker_symbol(ticker_symbol):
     """Converts user ticker to Yahoo Finance format."""
     ticker_symbol = ticker_symbol.upper()
+    
+    # 1. Map known indices
     if ticker_symbol == 'NIFTY':
         return '^NSEI'
     elif ticker_symbol == 'BANKNIFTY':
         return '^NSEBANK'
     elif ticker_symbol == 'SENSEX':
         return '^BSESN'
-    # Fallback/Default to .NS for Indian equity if it's not an index
-    elif len(ticker_symbol) < 6 and not ticker_symbol.endswith('.NS'):
+    elif ticker_symbol == 'FINNIFTY':
+        return '^NSEFINNIFTY' # Correct Yahoo Finance symbol for FINNIFTY
+    elif ticker_symbol == 'NITFY NXT50' or ticker_symbol == 'NIFTY NXT50':
+        return '^NIFTYNXT50' # Correct Yahoo Finance symbol for Nifty Next 50
+    
+    # 2. Map known stock tickers that might need a cleanup, then add .NS
+    # Note: Tickers like TATAEXLSI often need to be TATAELXSI.NS
+    # We rely on the .NS default unless otherwise known.
+    
+    # 3. Default: Append .NS for Indian equity if it's not already an index or recognized symbol
+    if not ticker_symbol.startswith('^') and not ticker_symbol.endswith(('.NS', '.BO')):
         return f'{ticker_symbol}.NS'
-    return ticker_symbol
+        
+    return ticker_symbol # Return as is if it's already an index or has a suffix
 
 # Load data when the application starts
 load_ticker_data()
 
-@app.route('/')
+@app.route('/option-calculator')
 def home():
-    # Render the main option calculator page as the homepage for local testing
+    # Render the main option calculator page
     tickers = sorted(TICKER_DATA.keys())
     return render_template('option_calculator.html', tickers=tickers)
 
@@ -111,6 +123,7 @@ def get_market_price():
         traceback.print_exc()
         return jsonify({'error': f'Failed to fetch data from Yahoo Finance for {ticker_name}'}), 500
 
+
 #if __name__ == '__main__':
     # Running locally for development
-   # app.run(host='0.0.0.0', port=5000, debug=True)
+    #app.run(host='0.0.0.0', port=5000, debug=True)
