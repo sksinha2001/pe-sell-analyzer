@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 /**
- * Calculates the expiry date (Last Tuesday or Thursday of the current month).
+ * Calculates the expiry date (Last Tuesday or Thursday of the CURRENT month).
  * @param {string} ticker The selected ticker symbol.
  * @param {Date} now The current date.
  * @returns {string} Expiry date in YYYY-MM-DD format.
@@ -52,7 +52,7 @@ function calculateExpiryDate(ticker, now = new Date()) {
     let year = now.getFullYear();
     let month = now.getMonth(); // 0-11
     
-    // SENSEX: Thursday (4), Others: Tuesday (2)
+    // SENSEX: Thursday (5), Others: Tuesday (3)
     const findDay = (ticker === 'SENSEX') ? 5 : 3; 
 
     function findLastTargetDay(y, m, dayOfWeek) {

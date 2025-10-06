@@ -4,7 +4,10 @@ from datetime import datetime
 import os
 import traceback 
 
+# Initialize Flask App
 app = Flask(__name__)
+
+# Global variables for ticker data
 TICKER_DATA = {}
 TICKER_FILE = 'tickers_data.txt' # File to be read for Ticker and Quantity data
 
@@ -43,8 +46,8 @@ def get_yf_ticker_symbol(ticker_symbol):
         return '^NSEBANK'
     elif ticker_symbol == 'SENSEX':
         return '^BSESN'
-    # Fallback/Default to .NS for Indian equity
-    elif not ticker_symbol.endswith('.NS'):
+    # Fallback/Default to .NS for Indian equity if it's not an index
+    elif len(ticker_symbol) < 6 and not ticker_symbol.endswith('.NS'):
         return f'{ticker_symbol}.NS'
     return ticker_symbol
 
@@ -60,7 +63,7 @@ def home():
 def option_calculator():
     # Pass the list of Tickers (keys from the loaded data) to the template for the dropdown
     tickers = sorted(TICKER_DATA.keys())
-    return render_template('option_calculator.html', tickers=tickers)
+    return render_template('templates/option_calculator.html', tickers=tickers)
 
 @app.route('/get_market_price')
 def get_market_price():
@@ -77,6 +80,8 @@ def get_market_price():
         
         # Fetch data using .info, which typically includes 50-DMA
         info = ticker.info
+        
+        # Safely retrieve market price (using multiple keys for robustness)
         market_price = info.get('currentPrice') or info.get('regularMarketPrice')
         
         if not market_price:
@@ -86,6 +91,7 @@ def get_market_price():
                 market_price = data['Close'].iloc[-1]
         
         if not market_price:
+            # Return 404 if data cannot be found for the symbol
             return jsonify({'error': f'Could not retrieve market price for {ticker_name}'}), 404
 
         # Fetch 50-DMA Price
@@ -105,11 +111,11 @@ def get_market_price():
         })
 
     except Exception as e:
+        # Catches network errors or other API failures and returns a 500
         print(f"Error fetching data for {ticker_name}: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Failed to fetch data from Yahoo Finance for {ticker_name}'}), 500
 
 if __name__ == '__main__':
     # Running locally for development
-    #app.run(host='0.0.0.0', port=5000, debug=True)
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
