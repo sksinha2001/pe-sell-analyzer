@@ -111,5 +111,5 @@ def get_market_price():
 
 if __name__ == '__main__':
     # Running locally for development
-    app.run(host='0.0.0.0', port=5000, debug=True)
-    #app.run(debug=True)
+    #app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(debug=True)
