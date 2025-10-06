@@ -56,14 +56,9 @@ load_ticker_data()
 
 @app.route('/')
 def home():
-    # Placeholder for a simple homepage
-    return render_template('index.html')
-
-@app.route('/option-calculator')
-def option_calculator():
-    # Pass the list of Tickers (keys from the loaded data) to the template for the dropdown
+    # Render the main option calculator page as the homepage for local testing
     tickers = sorted(TICKER_DATA.keys())
-    return render_template('templates/option_calculator.html', tickers=tickers)
+    return render_template('option_calculator.html', tickers=tickers)
 
 @app.route('/get_market_price')
 def get_market_price():
@@ -116,6 +111,6 @@ def get_market_price():
         traceback.print_exc()
         return jsonify({'error': f'Failed to fetch data from Yahoo Finance for {ticker_name}'}), 500
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
     # Running locally for development
-    app.run(host='0.0.0.0', port=5000, debug=True)
+   # app.run(host='0.0.0.0', port=5000, debug=True)
