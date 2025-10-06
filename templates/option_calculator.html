@@ -3,203 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PE Sell Analyzer</title> 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Updated App Header -->
+    <title>PE Option Sell Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* ADDED: CSS for color-coding the output */
-        .color-red { color: red; font-weight: bold; }
-        .color-amber { color: orange; font-weight: bold; }
-        .color-green { color: green; font-weight: bold; }
-        
-        /* Added simple flex for button alignment */
-        .input-card .form-group.fetch-group {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc;
         }
-        .input-card .form-group.fetch-group button {
-            height: 38px; 
-            padding: 0 15px; 
-            margin-bottom: 0;
+        .card {
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
         }
+        /* Custom colors for legend */
+        .legend-green { background-color: #10b981; color: white; }
+        .legend-amber { background-color: #f59e0b; color: white; }
+        .legend-red { background-color: #ef4444; color: white; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>PE Sell Analyzer</h1>
-        <div class="calculator-grid">
-            <div class="card input-card">
-                <h2>Inputs</h2>
-                
-                <div class="form-group fetch-group">
-                    <div style="flex-grow: 1;">
-                        <label for="ticker">Ticker (e.g., INFY.NS, NIFTY)</label>
-                        <input type="text" id="ticker" value="INFY.NS" required>
-                    </div>
-                    <button type="button" onclick="fetchMarketPrice()">Fetch Price</button>
-                </div>
-                <div class="form-group">
-                    <label for="strike-price">Strike Price</label>
-                    <input type="number" id="strike-price" value="1000">
-                </div>
-                
-                <div class="form-group">
-                    <label for="expiry-date">Expiry Date</label>
-                    <input type="date" id="expiryDate"> 
-                </div>
-                <div class="form-group">
-                    <label for="quantity">Quantity</label>
-                    <input type="number" id="quantity" value="1">
-                </div>
-                <div class="form-group">
-                    <label for="premium">Premium (Rs.)</label>
-                    <input type="number" id="premium" step="0.01" value="1.00">
-                </div>
-                
-                <div class="form-group">
-                    <label for="fund-req">Fund Req (Rs.)</label>
-                    <input type="text" id="fundReq" step="0.01" value="100,000" required>
-                </div>
+<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+
+    <div class="w-full max-w-lg bg-white p-6 sm:p-8 card border border-gray-200">
+        <!-- Updated App Header -->
+        <h1 class="text-3xl font-extrabold text-gray-900 mb-6 text-center">PE Option Sell Analyzer</h1>
+        
+        <!-- Input Fields -->
+        <div class="space-y-4">
+            
+            <!-- Ticker Dropdown -->
+            <div>
+                <label for="ticker" class="block text-sm font-medium text-gray-700">Ticker</label>
+                <select id="ticker" name="ticker" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <option value="" disabled selected>Select a Ticker</option>
+                    {% for ticker in tickers %}
+                        <option value="{{ ticker }}">{{ ticker }}</option>
+                    {% endfor %}
+                </select>
             </div>
 
-            <div class="card output-card">
-                <h2>Outputs</h2>
-                <div class="output-group">
-                    <label>Current Market Price</label>
-                    <span id="market-price" class="output-value">-</span>
-                </div>
-                <hr>
-                <h3>Legend & Metrics</h3>
-                <div class="output-group">
-                    <label>DTE (Days to Expiry)</label>
-                    <span id="dte" class="output-value legend-metric">-</span>
-                </div>
-                <div class="output-group">
-                    <label>ROI Per Week</label>
-                    <span id="roi" class="output-value legend-metric">-</span>
-                </div>
-                <div class="output-group">
-                    <label>Delta %</label>
-                    <span id="delta" class="output-value legend-metric">-</span>
-                </div>
+            <!-- Quantity (Auto-populated from Ticker) -->
+            <div>
+                <label for="quantity" class="block text-sm font-medium text-gray-700">Quantity</label>
+                <input type="number" id="quantity" name="quantity" required 
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100" 
+                       value="0" readonly>
             </div>
+            
+            <!-- Strike Price -->
+            <div>
+                <label for="strike-price" class="block text-sm font-medium text-gray-700">Strike Price</label>
+                <input type="number" id="strike-price" name="strike-price" required step="0.01" value="0"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <!-- Premium Paid/Received (Moved up, Label changed) -->
+            <div>
+                <label for="premium" class="block text-sm font-medium text-gray-700">Premium (Rs.) - per Quantity</label>
+                <input type="number" id="premium" name="premium" required step="0.01" value="0"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <!-- Funds Req (Rs.) - New editable input field (Default: 100000) -->
+            <div>
+                <label for="fund-req" class="block text-sm font-medium text-gray-700">Funds Req (Rs.)</label>
+                <!-- NOTE: Type is 'text' to allow custom Indian comma formatting via JavaScript -->
+                <input type="text" id="fund-req" name="fund-req" required value="100000"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-right"
+                       inputmode="numeric" pattern="[0-9,]*">
+            </div>
+
+            <!-- Expiry Date (Moved down) -->
+            <div>
+                <label for="expiry-date" class="block text-sm font-medium text-gray-700">Expiry Date</label>
+                <input type="date" id="expiry-date" name="expiry-date" required
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+        </div>
+
+        <hr class="my-8 border-t border-gray-200">
+        
+        <!-- Output: Current Market Price (Moved above Trade Analysis) -->
+        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-4">
+            <span class="text-sm font-medium text-gray-700">Current Market Price:</span>
+            <span id="market-price" class="text-lg font-bold text-blue-600">--</span>
+        </div>
+
+        <!-- Output: 50 DMA Percentage (Moved above Trade Analysis) -->
+        <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-4">
+            <span class="text-sm font-medium text-gray-700">50 DMA (% of CMP):</span>
+            <span id="dma50-percent" class="text-lg font-bold text-gray-800">--</span>
+        </div>
+        
+        <!-- Output & Results -->
+        <h2 class="text-xl font-bold text-gray-900 mb-4 text-center">Trade Analysis</h2>
+
+        <div class="space-y-4">
+            
+            <!-- Days To Expiry (DTE) -->
+            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-700">Days To Expiry (DTE):</span>
+                <span id="dte" class="text-lg font-bold px-3 py-1 rounded-full">--</span>
+            </div>
+            
+            <!-- ROI at Expiry -->
+            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-700">ROI at Expiry (%):</span>
+                <span id="roi" class="text-lg font-bold px-3 py-1 rounded-full">--</span>
+            </div>
+            
+            <!-- Delta % -->
+            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-700">Strike Price Delta (%):</span>
+                <span id="delta" class="text-lg font-bold px-3 py-1 rounded-full">--</span>
+	    </div>
+
         </div>
     </div>
 
-    <script>
-        // NOTE: This block contains the logic that needs to run on page load and on user input.
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            const fundReqInput = document.getElementById('fundReq');
-            const expiryDateInput = document.getElementById('expiryDate');
-
-            // --- DATE CALCULATION LOGIC ---
-            function calculateDefaultExpiryDate() {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0); 
-                let year = today.getFullYear();
-                let month = today.getMonth(); 
-                
-                // Function to find the last Tuesday of a specific month/year
-                const findLastTuesday = (y, m) => {
-                    let date = new Date(y, m + 1, 0); // Start at last day of the month
-                    while (date.getDay() !== 2) { // 2 is Tuesday
-                        date.setDate(date.getDate() - 1);
-                    }
-                    return date;
-                };
-
-                let lastTuesdayCurrent = findLastTuesday(year, month);
-
-                // Check the criteria: If this Tuesday is before or equal to today
-                let finalExpiryDate;
-                if (lastTuesdayCurrent <= today) {
-                    // Use the last Tuesday of the FOLLOWING month
-                    if (month === 11) {
-                        year++;
-                        month = 0;
-                    } else {
-                        month++;
-                    }
-                    finalExpiryDate = findLastTuesday(year, month);
-                } else {
-                    // Use the last Tuesday of the CURRENT month
-                    finalExpiryDate = lastTuesdayCurrent;
-                }
-
-                // Format as YYYY-MM-DD for the input field
-                const y = finalExpiryDate.getFullYear();
-                const m = String(finalExpiryDate.getMonth() + 1).padStart(2, '0');
-                const d = String(finalExpiryDate.getDate()).padStart(2, '0');
-                return `${y}-${m}-${d}`;
-            }
-
-            expiryDateInput.value = calculateDefaultExpiryDate();
-
-            // --- FUND REQ FORMATTING LOGIC (Comma Separation) ---
-            function formatNumber(n) {
-                const num = parseFloat(n.replace(/,/g, ''));
-                if (isNaN(num)) return '';
-                // Use 'en-IN' locale for lakh/crore style, or 'en-US' for standard commas
-                return num.toLocaleString('en-IN', { maximumFractionDigits: 0 }); 
-            }
-
-            // Initial format of the default value
-            fundReqInput.value = formatNumber(fundReqInput.value);
-
-            fundReqInput.addEventListener('input', (event) => {
-                const cursorPosition = event.target.selectionStart;
-                const unformatted = event.target.value.replace(/,/g, '');
-                const oldValue = event.target.value;
-                
-                event.target.value = formatNumber(unformatted);
-                
-                // Recalculate cursor position
-                const newLength = event.target.value.length;
-                const oldLength = oldValue.length;
-                const offset = newLength - oldLength;
-                
-                event.target.setSelectionRange(cursorPosition + offset, cursorPosition + offset);
-            });
-        });
-
-        // --- CURRENT MARKET PRICE FETCHING LOGIC (Called by 'Fetch Price' button) ---
-        async function fetchMarketPrice() {
-            const ticker = document.getElementById('ticker').value;
-            const marketPriceSpan = document.getElementById('market-price');
-
-            if (!ticker) {
-                alert("Please enter a ticker symbol.");
-                return;
-            }
-
-            marketPriceSpan.textContent = 'Fetching...'; 
-
-            try {
-                // Call the Flask route defined in main.py
-                const response = await fetch(`/get_market_price?ticker=${ticker}`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Update the Current Market Price span
-                    marketPriceSpan.textContent = `Rs. ${data.market_price.toFixed(2)}`;
-                    
-                    // Trigger full calculation after fetching price (assuming calculate() is in script.js)
-                    if (typeof calculate === 'function') {
-                        calculate();
-                    }
-
-                } else {
-                    marketPriceSpan.textContent = 'Error';
-                    alert(`Error fetching price: ${data.error || 'Failed to fetch price.'}`);
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                marketPriceSpan.textContent = 'Error';
-                alert('An error occurred while connecting to the price service.');
-            }
-        }
-    </script>
+    <!-- Link to the front-end logic -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

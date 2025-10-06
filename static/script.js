@@ -2,171 +2,272 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Element References ---
     const tickerInput = document.getElementById('ticker');
     const strikePriceInput = document.getElementById('strike-price');
-    // FIXED ID to match the HTML: 'expiryDate'
-    const expiryDateInput = document.getElementById('expiryDate'); 
+    const expiryDateInput = document.getElementById('expiry-date');
     const quantityInput = document.getElementById('quantity');
     const premiumInput = document.getElementById('premium');
-    // FIXED ID to match the HTML: 'fundReq'
-    const fundReqInput = document.getElementById('fundReq'); 
+    // fundReqInput is now type="text" for custom formatting
+    const fundReqInput = document.getElementById('fund-req'); 
 
     const marketPriceOutput = document.getElementById('market-price');
+    const dma50PercentOutput = document.getElementById('dma50-percent'); 
     const dteOutput = document.getElementById('dte');
     const roiOutput = document.getElementById('roi');
     const deltaOutput = document.getElementById('delta');
-
-    // --- Initial Setup ---
-
-    // CORRECTED LOGIC: last Tuesday of current month if in future, else next month
-    function setDefaultExpiryDate() {
-        const TUESDAY = 2;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalize today to start of day
-
-        let year = today.getFullYear();
-        let month = today.getMonth();
-        
-        // 1. Find the last Tuesday of the CURRENT month
-        let currentMonthLastDay = new Date(year, month + 1, 0); 
-        let lastTuesdayCurrent = new Date(currentMonthLastDay);
-        
-        // Step back until we hit Tuesday
-        while (lastTuesdayCurrent.getDay() !== TUESDAY) {
-            lastTuesdayCurrent.setDate(lastTuesdayCurrent.getDate() - 1);
-        }
-
-        let finalExpiryDate = lastTuesdayCurrent;
-
-        // 2. Check the condition: Use next month's Tuesday if current is on or before today
-        if (lastTuesdayCurrent <= today) {
-            // Move to the next month
-            month++;
-            if (month > 11) {
-                month = 0;
-                year++;
-            }
-            
-            // Find the last Tuesday of the NEXT month
-            let nextMonthLastDay = new Date(year, month + 1, 0);
-            finalExpiryDate = new Date(nextMonthLastDay);
-            
-            // Step back until we hit Tuesday
-            while (finalExpiryDate.getDay() !== TUESDAY) {
-                finalExpiryDate.setDate(finalExpiryDate.getDate() - 1);
-            }
-        }
-        
-        // Format the date as YYYY-MM-DD for the input field
-        const y = finalExpiryDate.getFullYear();
-        const m = String(finalExpiryDate.getMonth() + 1).padStart(2, '0');
-        const d = String(finalExpiryDate.getDate()).padStart(2, '0');
-        expiryDateInput.value = `${y}-${m}-${d}`;
-    }
-
-    // --- Calculation Logic ---
-
-    async function calculate() {
-        // 1. Get all input values
-        const ticker = tickerInput.value || 'INFY.NS';
-        const strikePrice = parseFloat(strikePriceInput.value) || 0;
-        const expiryDate = expiryDateInput.value;
-        const quantity = parseInt(quantityInput.value) || 0;
-        const premium = parseFloat(premiumInput.value) || 0;
-        
-        // Use unformatted fund req value (remove commas) for calculation
-        const fundReq = parseFloat(fundReqInput.value.replace(/,/g, '')) || 0; 
-
-        // 2. Fetch Market Price (Only if marketPriceOutput is not already set by fetchMarketPrice button)
-        let marketPriceText = marketPriceOutput.textContent.replace('Rs. ', '').replace('Fetching...', '').replace('Error', '').trim();
-        let marketPrice = parseFloat(marketPriceText) || 0;
-
-        // 3. Calculate DTE (Days to Expiry)
-        let dte = 0;
-        if (expiryDate) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); 
-            const expiry = new Date(expiryDate);
-            const diffTime = expiry - today;
-            dte = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        }
-        dteOutput.textContent = dte >= 0 ? dte : 'Expired';
-        updateLegendColor(dteOutput, dte, [15, 8], false);
-
-        // 4. Calculate ROI Per Week
-        let roi = 0;
-        if (fundReq > 0 && dte > 0) {
-            roi = (((quantity * premium) / fundReq) / (dte / 7)) * 100;
-        }
-        roiOutput.textContent = `${roi.toFixed(2)}%`;
-        updateLegendColor(roiOutput, roi, [1, 0.5], true);
-
-        // 5. Calculate Delta %
-        let delta = 0;
-        if (strikePrice > 0 && marketPrice > 0) {
-            delta = ((marketPrice - strikePrice) / strikePrice) * 100;
-        }
-        deltaOutput.textContent = `${delta.toFixed(2)}%`;
-        
-        // Apply new Delta color-coding criteria
-        applyDeltaColor(delta);
-    }
+    
 
     // --- Helper Functions ---
     
-    // NEW: Delta % specific color logic
-    function applyDeltaColor(deltaValue) {
-        const delta = parseFloat(deltaValue);
-        deltaOutput.classList.remove('color-red', 'color-amber', 'color-green'); 
-
-        if (isNaN(delta)) return;
-
-        if (delta < 5) {
-            // Delta < 5% -> Red
-            deltaOutput.classList.add('color-red');
-        } else if (delta < 10) {
-            // Delta >= 5% but < 10% -> Amber
-            deltaOutput.classList.add('color-amber');
-        } else {
-            // Delta >= 10% -> Green
-            deltaOutput.classList.add('color-green');
+    /**
+     * Formats a number using the Indian numbering system (lakh, crore).
+     * @param {number|string} num The number to format.
+     * @returns {string} The formatted string (e.g., "1,00,000").
+     */
+    function formatIndianNumber(num) {
+        if (typeof num === 'string') {
+            num = num.replace(/,/g, ''); // Remove existing commas for clean formatting
         }
+        if (isNaN(num) || num === null) return '';
+        
+        let x = Math.round(parseFloat(num)).toString();
+        let lastThree = x.substring(x.length - 3);
+        let otherNumbers = x.substring(0, x.length - 3);
+        
+        if (otherNumbers !== '') {
+            lastThree = ',' + lastThree;
+        }
+        
+        // Use regex for Indian style grouping (2 digits after the first 3)
+        let formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + lastThree;
+        return formatted;
     }
 
 
+/**
+ * Calculates the expiry date (Last Tuesday or Thursday of the current month).
+ * @param {string} ticker The selected ticker symbol.
+ * @param {Date} now The current date.
+ * @returns {string} Expiry date in YYYY-MM-DD format.
+ */
+function calculateExpiryDate(ticker, now = new Date()) {
+    let year = now.getFullYear();
+    let month = now.getMonth(); // 0-11
+    
+    // SENSEX: Thursday (4), Others: Tuesday (2)
+    const findDay = (ticker === 'SENSEX') ? 5 : 3; 
+
+    function findLastTargetDay(y, m, dayOfWeek) {
+        // Start by finding the last day of the CURRENT month (m + 1, 0)
+        let lastDay = new Date(y, m + 1, 0);
+        
+        // Loop backward from the last day until we hit the target dayOfWeek (2 or 4)
+        while (lastDay.getDay() !== dayOfWeek) {
+            lastDay.setDate(lastDay.getDate() - 1);
+        }
+        
+        // Set time to midnight for consistency
+        lastDay.setHours(0, 0, 0, 0); 
+        return lastDay;
+    }
+
+    // Find the last target day of the CURRENT month only.
+    const finalDate = findLastTargetDay(year, month, findDay);
+    
+    // Format as YYYY-MM-DD
+    return finalDate.toISOString().split('T')[0];
+}
+   
+    /**
+     * Sets the default expiry date for the selected ticker.
+     */
+    function setDefaultExpiryDate() {
+        const ticker = tickerInput.value;
+        // Set expiry using the calculated last Tuesday/Thursday based on the ticker
+        expiryDateInput.value = calculateExpiryDate(ticker);
+    }
+
+    /**
+     * Fetches market price, quantity, and 50 DMA percentage from the backend.
+     */
+    async function fetchTickerData() {
+        const ticker = tickerInput.value;
+        if (!ticker) return;
+        
+        marketPriceOutput.textContent = 'Loading...';
+        dma50PercentOutput.textContent = '--';
+
+        try {
+            // Implement exponential backoff for robustness
+            let data = null;
+            for (let i = 0; i < 3; i++) {
+                const response = await fetch(`/get_market_price?ticker=${ticker}`);
+                if (response.status === 200) {
+                    data = await response.json();
+                    break;
+                }
+                if (i < 2) {
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                }
+            }
+
+            if (!data || data.error) {
+                marketPriceOutput.textContent = 'Error';
+                console.error('API Error:', data ? data.error : 'Failed to retrieve data after retries.');
+                quantityInput.value = 0;
+                dma50PercentOutput.textContent = 'Error';
+                return;
+            }
+
+            // 1. Update Market Price
+            const marketPrice = data.market_price;
+            marketPriceOutput.textContent = marketPrice.toFixed(2);
+
+            // 2. Auto-populate Quantity
+            quantityInput.value = data.quantity;
+            
+            // 3. Update 50 DMA Percentage
+            dma50PercentOutput.textContent = `${data.dma_50_percent.toFixed(2)}%`;
+
+            // 4. Update Expiry Date based on Ticker logic (Tuesday/Thursday)
+            setDefaultExpiryDate();
+
+        } catch (error) {
+            marketPriceOutput.textContent = 'Failed';
+            console.error('Fetch error:', error);
+            quantityInput.value = 0;
+            dma50PercentOutput.textContent = 'Failed';
+        }
+        
+        // Always run calculation after data fetch
+        calculate();
+    }
+
+
+    /**
+     * Performs all calculations and updates the output fields.
+     */
+    function calculate() {
+        // --- INPUT PARSING ---
+        const marketPrice = parseFloat(marketPriceOutput.textContent.replace(/[^\d.]/g, '')) || 0;
+        const strikePrice = parseFloat(strikePriceInput.value) || 0;
+        const expiryDateStr = expiryDateInput.value;
+        const quantity = parseFloat(quantityInput.value) || 0;
+        const premium = parseFloat(premiumInput.value) || 0;
+        
+        // Parse Total Funds, explicitly removing commas first
+        const totalFunds = parseFloat(fundReqInput.value.replace(/,/g, '')) || 0;
+
+
+        // Reset outputs if core data is missing or calculation is nonsensical
+        if (!marketPrice || !strikePrice || !expiryDateStr || !quantity || !totalFunds) {
+            dteOutput.textContent = '--';
+            roiOutput.textContent = '--';
+            deltaOutput.textContent = '--';
+            return;
+        }
+
+        // 1. Calculate Days To Expiry (DTE)
+        const today = new Date();
+        const expiry = new Date(expiryDateStr);
+        expiry.setHours(23, 59, 59, 999); 
+        
+        const diffTime = expiry.getTime() - today.getTime();
+        let dte = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        dte = Math.max(0, dte); 
+
+        dteOutput.textContent = dte;
+        // DTE Legend: Green > 30, Amber > 15, Red <= 15
+        updateLegendColor(dteOutput, dte, [30, 15], true);
+
+        // 2. Calculate ROI (PE Option Sell: P/L = (Premium - Max(0, Strike - Market)) * Quantity)
+        const intrinsicValueAtExpiry = Math.max(0, strikePrice - marketPrice);
+        
+        const totalPremiumReceived = premium * quantity; 
+        const totalIntrinsicLoss = intrinsicValueAtExpiry * quantity;
+
+        // Total Profit/Loss at expiry (assuming no brokerage)
+        const totalProfitLoss = totalPremiumReceived - totalIntrinsicLoss;
+        
+        let roi = 0;
+        if (totalFunds > 0) {
+             // ROI based on (P/L) / (Funds Required)
+            roi = (totalProfitLoss / totalFunds) * 100;
+        } else if (totalFunds === 0 && totalProfitLoss > 0) {
+            roi = Infinity;
+        }
+        
+        roiOutput.textContent = `${roi.toFixed(2)}%`;
+        // ROI Legend: Green >= 1%, Amber >= 0.5%, Red < 0.5%
+        updateLegendColor(roiOutput, roi, [1, 0.5], true);
+
+        // 3. Calculate Delta % (Difference between market price and strike price as a percentage of strike)
+        let delta = 0;
+        if (strikePrice > 0) {
+            delta = ((marketPrice - strikePrice) / strikePrice) * 100;
+        }
+        deltaOutput.textContent = `${delta.toFixed(2)}%`;
+        // Delta Legend: Green >= 10%, Amber >= 5%, Red < 5% (Higher is safer for PE Sell)
+        updateLegendColor(deltaOutput, delta, [10, 5], true);
+    }
+
+    // --- Helper Function for Color Legend ---
+
     function updateLegendColor(element, value, thresholds, isGreenHigh) {
-        // Use the correct color classes defined in the HTML
-        element.classList.remove('color-red', 'color-amber', 'color-green'); 
+        // Clear existing classes
+        element.classList.remove('legend-red', 'legend-amber', 'legend-green');
+        // The HTML/CSS is expected to define the text color as white for these classes.
+        element.classList.add('px-3', 'py-1', 'rounded-full'); 
+        
         const [high, low] = thresholds;
 
         if (isGreenHigh) { 
             if (value >= high) {
-                element.classList.add('color-green');
+                element.classList.add('legend-green');
             } else if (value >= low) {
-                element.classList.add('color-amber');
+                element.classList.add('legend-amber');
             } else {
-                element.classList.add('color-red');
+                element.classList.add('legend-red');
             }
-        } else { 
-            if (value >= high) {
-                element.classList.add('color-green');
-            } else if (value >= low) {
-                element.classList.add('color-amber');
+        } else {
+            // Not used in current application logic but kept for generality (e.g., lower is better)
+            if (value <= low) {
+                element.classList.add('legend-green');
+            } else if (value < high) {
+                element.classList.add('legend-amber');
             } else {
-                element.classList.add('color-red');
+                element.classList.add('legend-red');
             }
         }
     }
 
-
     // --- Event Listeners ---
-    // Note: The fundReq formatting listener is assumed to be in the HTML script block
-    const inputs = [tickerInput, strikePriceInput, expiryDateInput, quantityInput, premiumInput, fundReqInput];
     
-    // Listen to all inputs to re-calculate
+    // Listen for changes in the Ticker dropdown to fetch data and auto-populate
+    tickerInput.addEventListener('change', fetchTickerData);
+    
+    // Listen for changes in other inputs to recalculate
+    const inputs = [strikePriceInput, expiryDateInput, premiumInput];
     inputs.forEach(input => {
         input.addEventListener('input', calculate);
     });
 
-    // --- Initial Call ---
+    // Funds Req input specific logic: format on blur, unformat on focus
+    fundReqInput.addEventListener('blur', (e) => {
+        // Format the value when the user leaves the field
+        const value = e.target.value.replace(/[^0-9]/g, ''); // Clean non-digits
+        e.target.value = formatIndianNumber(value);
+        calculate();
+    });
+
+    fundReqInput.addEventListener('focus', (e) => {
+        // Remove formatting when the user clicks into the field
+        e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    });
+
+    // Initial setup
     setDefaultExpiryDate();
-    calculate();
+    
+    // Format the default fund value on load
+    fundReqInput.value = formatIndianNumber(fundReqInput.value);
+
+    calculate(); // Initial calculation for default values
 });
