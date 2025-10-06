@@ -175,8 +175,8 @@ function calculateExpiryDate(ticker, now = new Date()) {
         dte = Math.max(0, dte); 
 
         dteOutput.textContent = dte;
-        // DTE Legend: Green > 30, Amber > 15, Red <= 15
-        updateLegendColor(dteOutput, dte, [30, 15], true);
+        // DTE Legend: Green >= 15, Amber < 15, Red <= 7
+        updateLegendColor(dteOutput, dte, [15, 7], true);
 
         // 2. Calculate ROI (PE Option Sell: P/L = (Premium - Max(0, Strike - Market)) * Quantity)
         const intrinsicValueAtExpiry = Math.max(0, strikePrice - marketPrice);
