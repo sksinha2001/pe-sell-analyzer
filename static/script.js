@@ -165,14 +165,20 @@ function calculateExpiryDate(ticker, now = new Date()) {
             return;
         }
 
-        // 1. Calculate Days To Expiry (DTE)
+       // 1. Calculate Days To Expiry (DTE) - CORRECTED LOGIC
         const today = new Date();
         const expiry = new Date(expiryDateStr);
-        expiry.setHours(23, 59, 59, 999); 
         
-        const diffTime = expiry.getTime() - today.getTime();
-        let dte = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        dte = Math.max(0, dte); 
+         // Normalize both dates to midnight to ensure accurate whole day difference
+        const todayNormalized = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const expiryNormalized = new Date(expiry.getFullYear(), expiry.getMonth(), expiry.getDate());
+        
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const diffTime = expiryNormalized.getTime() - todayNormalized.getTime();
+        
+        // Use Math.floor() to accurately calculate the number of full calendar days remaining.
+        let dte = Math.floor(diffTime / msPerDay);
+        dte = Math.max(0, dte); // DTE cannot be negative
 
         dteOutput.textContent = dte;
         // DTE Legend: Green >= 15, Amber >= 7, Red < 7
