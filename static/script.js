@@ -178,26 +178,29 @@ function calculateExpiryDate(ticker, now = new Date()) {
         // DTE Legend: Green >= 15, Amber >= 7, Red < 7
         updateLegendColor(dteOutput, dte, [15, 7], true);
 
-        // 2. Calculate ROI (PE Option Sell: P/L = (Premium - Max(0, Strike - Market)) * Quantity)
-        const intrinsicValueAtExpiry = Math.max(0, strikePrice - marketPrice);
-        
+        // 2. Calculate ROI % per week (Yield on Premium / Weeks to Expiry)
         const totalPremiumReceived = premium * quantity; 
-        const totalIntrinsicLoss = intrinsicValueAtExpiry * quantity;
-
-        // Total Profit/Loss at expiry (assuming no brokerage)
-        const totalProfitLoss = totalPremiumReceived - totalIntrinsicLoss;
         
-        let roi = 0;
+        let totalPremiumYield = 0;
         if (totalFunds > 0) {
-             // ROI based on (P/L) / (Funds Required)
-            roi = (totalProfitLoss / totalFunds) * 100;
-        } else if (totalFunds === 0 && totalProfitLoss > 0) {
-            roi = Infinity;
+             // 1. Calculate Total Premium Yield (%)
+            totalPremiumYield = (totalPremiumReceived / totalFunds) * 100;
         }
-        
-        roiOutput.textContent = `${roi.toFixed(2)}%`;
-        // ROI Legend: Green >= 1%, Amber >= 0.5%, Red < 0.5%
-        updateLegendColor(roiOutput, roi, [1, 0.5], true);
+
+        const weeksToExpiry = dte / 7;
+        let weeklyRoi = 0;
+
+        if (weeksToExpiry > 0) {
+            // 2. Calculate ROI % per week
+            weeklyRoi = totalPremiumYield / weeksToExpiry;
+        } else if (totalPremiumYield > 0 && weeksToExpiry === 0) {
+            // If DTE is 0 but premium was received, display the total yield (DTE is 0 or less)
+            weeklyRoi = totalPremiumYield; 
+        }
+
+        roiOutput.textContent = `${weeklyRoi.toFixed(2)}%`;
+        // ROI Legend: Green >= 1%, Amber >= 0.5%, Red < 0.5% (Thresholds remain the same)
+        updateLegendColor(roiOutput, weeklyRoi, [1, 0.5], true);
 
         // 3. Calculate Delta % (Difference between market price and strike price as a percentage of strike)
         let delta = 0;
